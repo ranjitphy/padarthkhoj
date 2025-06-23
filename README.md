@@ -13,10 +13,10 @@
 
 
 ##padarthkhoj- CO/CO2ER
-![Part I Workflow](images/CO/CO2ER.png)
+![Part I Workflow](images/CO_CO2ER.)
 
 
 
 
 ##padarthkhoj- NRR
-![Part I Workflow](images/NRR.png)
+![Part I Workflow](images/NRR.tif)
