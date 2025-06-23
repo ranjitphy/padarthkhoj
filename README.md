@@ -19,4 +19,4 @@
 
 
 ##padarthkhoj- NRR
-![Part I Workflow](images/NRR.tif)
+![Part I Workflow](images/NRR.jpg)
