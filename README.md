@@ -2,7 +2,7 @@
 #### Catalyst Activity Prediction using First-Principles and Graph Neural Networks and Interpretable Machine Learning
 
 ##padarthkhoj- OER/ORR
-![Part I Workflow](images/part1_workflow.png)
+![OER/ORR](images/part1_workflow.png)
 
 
 
