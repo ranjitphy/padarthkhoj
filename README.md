@@ -13,7 +13,7 @@
 
 
 ##padarthkhoj- CO/CO2ER
-![Part I Workflow](images/CO_CO2ER.)
+![Part I Workflow](images/CO_CO2ER.jpg)
 
 
 
