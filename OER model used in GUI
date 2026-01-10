@@ -1,0 +1,130 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.model_selection import KFold, cross_val_score
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import r2_score
+from sklearn.linear_model import LinearRegression, Ridge, Lasso, BayesianRidge
+from sklearn.svm import SVR
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.neighbors import KNeighborsRegressor
+import warnings
+import os
+
+warnings.filterwarnings("ignore")
+
+# ==============================================================================
+# Data Loading and Preprocessing
+# ==============================================================================
+try:
+    df_train = pd.read_csv("oer_training.csv")
+    df_test = pd.read_csv("oer_test.csv")
+except FileNotFoundError:
+    print("Error: Ensure both 'oer_sama.csv' and 'oer_test.csv' are in the same directory.")
+    exit()
+
+# Drop rows with any NaN, inf, or other non-finite values from both dataframes
+# This is a crucial step to prevent errors with machine learning models.
+df_train.replace([np.inf, -np.inf], np.nan, inplace=True)
+df_test.replace([np.inf, -np.inf], np.nan, inplace=True)
+df_train.dropna(inplace=True)
+df_test.dropna(inplace=True)
+
+# Define features (X) and the target variable (y) for both datasets
+# Features are in columns 0-3, and the target is in column 4.
+X_train = df_train.iloc[:, 0:4].values
+y_train = df_train.iloc[:, 4].values.reshape(-1, 1)
+
+X_test = df_test.iloc[:, 0:4].values
+y_test = df_test.iloc[:, 4].values.reshape(-1, 1)
+
+# Feature Scaling: A crucial step for several models (SVR, Ridge, KNN, etc.)
+# We fit the scaler on the training data ONLY to prevent data leakage,
+# then apply the same transformation to the test data.
+sc_X = StandardScaler()
+X_train_scaled = sc_X.fit_transform(X_train)
+X_test_scaled = sc_X.transform(X_test)
+
+sc_y = StandardScaler()
+y_train_scaled = sc_y.fit_transform(y_train)
+
+# ==============================================================================
+# Model Initialization and Evaluation
+# ==============================================================================
+results = {}
+models = [
+    ("Multiple Linear Regression (MLR)", LinearRegression(), 'unscaled'),
+    ("Support Vector Regression (SVR)", SVR(kernel='linear'), 'scaled'),
+    ("Random Forest Regression (RFR)", RandomForestRegressor(n_estimators=200, random_state=0), 'unscaled'),
+    ("Ridge Regression (RR)", Ridge(), 'scaled'),
+    ("K-Nearest Neighbours (KNN)", KNeighborsRegressor(n_neighbors=5), 'scaled'),
+    ("Bayesian Ridge Regression (BRR)", BayesianRidge(), 'scaled'),
+    ("Least Absolute Shrinkage and Selection Operator (LASSO)", Lasso(alpha=0.1), 'scaled')
+]
+
+kf = KFold(n_splits=5, shuffle=True, random_state=42)
+
+for model_name, model, scale_type in models:
+    print(f"\n--- Training and Evaluating {model_name} ---")
+    
+    # Select the appropriate data for cross-validation based on the model's requirements
+    if scale_type == 'scaled':
+        X_train_data = X_train_scaled
+        y_train_data = y_train_scaled.ravel()
+        X_test_data = X_test_scaled
+    else:
+        X_train_data = X_train
+        y_train_data = y_train.ravel()
+        X_test_data = X_test
+
+    # Perform K-Fold Cross-Validation on the training set
+    cv_scores = cross_val_score(model, X_train_data, y_train_data, cv=kf, scoring='r2', n_jobs=-1)
+    print(f"R-squared (Cross-Validation Scores): {cv_scores}")
+    print(f"Mean R-squared (CV): {np.mean(cv_scores):.4f} +/- {np.std(cv_scores):.4f}")
+
+    # Now, train the model on the entire training set and evaluate on the test set
+    model.fit(X_train_data, y_train_data)
+    y_pred_train = model.predict(X_train_data)
+    y_pred_test = model.predict(X_test_data)
+
+    # Inverse transform predictions for plotting and R^2 calculation
+    # Only scaled models need inverse transformation
+    if scale_type == 'scaled':
+        y_pred_train_inv = sc_y.inverse_transform(y_pred_train.reshape(-1, 1))
+        y_pred_test_inv = sc_y.inverse_transform(y_pred_test.reshape(-1, 1))
+    else:
+        y_pred_train_inv = y_pred_train.reshape(-1, 1)
+        y_pred_test_inv = y_pred_test.reshape(-1, 1)
+
+    # Calculate R-squared scores
+    r2_train = r2_score(y_train, y_pred_train_inv)
+    r2_test = r2_score(y_test, y_pred_test_inv)
+
+    print(f"R-squared (Training): {r2_train:.4f}")
+    print(f"R-squared (Testing): {r2_test:.4f}")
+
+    # Store results for later use
+    results[model_name] = {
+        'r2_train': r2_train,
+        'r2_test': r2_test,
+        'y_pred_train': y_pred_train_inv,
+        'y_pred_test': y_pred_test_inv,
+        'cv_mean_r2': np.mean(cv_scores)
+    }
+
+color_train = 'royalblue'
+color_test = 'firebrick'
+for model_name, data in results.items():
+    plt.figure(figsize=(12, 8))
+    ax = plt.gca()
+    plt.rc('text', usetex=False)
+    ax.scatter(data['y_pred_train'], y_train, c=color_train, marker='o', alpha=1,
+               edgecolors='k', s=80, label=f'Training, R$^2$ = {data["r2_train"]:.2f}')
+    ax.scatter(data['y_pred_test'], y_test, c=color_test, marker='o', alpha=1,
+               edgecolors='k', s=100, label=f'Test, R$^2$ = {data["r2_test"]:.2f}')
+    ax.set_title(f'{model_name} Performance\n(CV Mean R$^2$ = {data["cv_mean_r2"]:.2f})', fontsize=28, fontweight='bold')
+    ax.set_xlabel('Predicted $\Delta$GO - $\Delta$GOH', fontsize=24)
+    ax.set_ylabel('DFT $\Delta$GO - $\Delta$GOH', fontsize=26)
+    ax.legend(fontsize=26)
+    ax.tick_params(axis='both', which='major', labelsize=26)
+    plt.tight_layout()
