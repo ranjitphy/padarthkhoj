@@ -1,1 +1,910 @@
+import tkinter as tk
+from tkinter import filedialog, messagebox, ttk
+import os
+import shutil
+import pandas as pd
+import numpy as np
+from sklearn.preprocessing import StandardScaler
+from sklearn.svm import SVR
+from sklearn.linear_model import LinearRegression # Import LinearRegression
+from sklearn.metrics import r2_score
 
+
+# === MODEL TRAINING SECTION
+
+
+# Dictionary to store the trained models and their scalers
+trained_models = {}
+
+def train_oer_model():
+    """Trains and stores the SVR model for OER analysis."""
+    try:
+        df_train = pd.read_csv("oer.csv")
+        x_train_orig = df_train.iloc[:, 0:4].values
+        y_train_orig = df_train.iloc[:, 4].values.reshape(-1, 1)
+
+        sc_X = StandardScaler()
+        X_train_scaled = sc_X.fit_transform(x_train_orig)
+        sc_y = StandardScaler()
+        y_train_scaled = sc_y.fit_transform(y_train_orig)
+
+        regressor_svr = SVR(kernel='linear')
+        regressor_svr.fit(X_train_scaled, y_train_scaled.ravel())
+        trained_models['OER_SVR'] = {
+            'model': regressor_svr,
+            'scaler_X': sc_X,
+            'scaler_y': sc_y
+        }
+        print("OER SVR model trained successfully.")
+    except FileNotFoundError:
+        messagebox.showerror("Error", "Training file 'oer_sama.csv' not found.")
+    except Exception as e:
+        messagebox.showerror("Error", f"An error occurred during OER SVR model training: {e}")
+
+def train_orr_model():
+    """Trains and stores the SVR model for ORR analysis."""
+    try:
+        df_train = pd.read_csv("orr.csv")
+        x_train_orig = df_train.iloc[:, 0:2].values
+        y_train_orig = df_train.iloc[:, 2].values.reshape(-1, 1)
+
+        sc_X = StandardScaler()
+        X_train_scaled = sc_X.fit_transform(x_train_orig)
+        sc_y = StandardScaler()
+        y_train_scaled = sc_y.fit_transform(y_train_orig)
+
+        regressor_svr = SVR(kernel='linear')
+        regressor_svr.fit(X_train_scaled, y_train_scaled.ravel())
+        trained_models['ORR_SVR'] = {
+            'model': regressor_svr,
+            'scaler_X': sc_X,
+            'scaler_y': sc_y
+        }
+        print("ORR SVR model trained successfully.")
+    except FileNotFoundError:
+        messagebox.showerror("Error", "Training file 'orr.csv' not found.")
+    except Exception as e:
+        messagebox.showerror("Error", f"An error occurred during ORR SVR model training: {e}")
+
+def train_oer_mlr_model():
+    """Trains and stores the MLR model for OER analysis."""
+    try:
+        df_train = pd.read_csv("oer_sama.csv")
+        x_train_orig = df_train.iloc[:, 0:4].values
+        y_train_orig = df_train.iloc[:, 4].values.reshape(-1, 1)
+
+        sc_X = StandardScaler()
+        X_train_scaled = sc_X.fit_transform(x_train_orig)
+        sc_y = StandardScaler()
+        y_train_scaled = sc_y.fit_transform(y_train_orig)
+
+        regressor_mlr = LinearRegression()
+        regressor_mlr.fit(X_train_scaled, y_train_scaled.ravel())
+        trained_models['OER_MLR'] = {
+            'model': regressor_mlr,
+            'scaler_X': sc_X,
+            'scaler_y': sc_y
+        }
+        print("OER MLR model trained successfully.")
+    except FileNotFoundError:
+        messagebox.showerror("Error", "Training file 'oer_sama.csv' not found for MLR.")
+    except Exception as e:
+        messagebox.showerror("Error", f"An error occurred during OER MLR model training: {e}")
+
+def train_orr_mlr_model():
+    """Trains and stores the MLR model for ORR analysis."""
+    try:
+        df_train = pd.read_csv("orr.csv")
+        x_train_orig = df_train.iloc[:, 0:2].values
+        y_train_orig = df_train.iloc[:, 2].values.reshape(-1, 1)
+
+        sc_X = StandardScaler()
+        X_train_scaled = sc_X.fit_transform(x_train_orig)
+        sc_y = StandardScaler()
+        y_train_scaled = sc_y.fit_transform(y_train_orig)
+
+        regressor_mlr = LinearRegression()
+        regressor_mlr.fit(X_train_scaled, y_train_scaled.ravel())
+        trained_models['ORR_MLR'] = {
+            'model': regressor_mlr,
+            'scaler_X': sc_X,
+            'scaler_y': sc_y
+        }
+        print("ORR MLR model trained successfully.")
+    except FileNotFoundError:
+        messagebox.showerror("Error", "Training file 'orr.csv' not found for MLR.")
+    except Exception as e:
+        messagebox.showerror("Error", f"An error occurred during ORR MLR model training: {e}")
+
+
+# === CORE ANALYSIS FUNCTIONS
+
+
+def read_contcar(filename):
+    """
+    Parse a CONTCAR file to extract lattice vectors, fractional coordinates,
+    and 0-based carbon atom indices.
+    """
+    try:
+        with open(filename, 'r') as f:
+            lines = f.readlines()
+    except FileNotFoundError:
+        print(f"Error: CONTCAR file not found at {filename}")
+        return None, None, None
+    if len(lines) < 8:
+        print(f"Error: CONTCAR file {filename} seems too short.")
+        return None, None, None
+
+    try:
+        scaling_factor = float(lines[1].strip())
+        lattice = np.array([list(map(float, lines[i].split())) for i in range(2, 5)]) * scaling_factor
+        atom_symbols = lines[5].split()
+        natoms = list(map(int, lines[6].split()))
+        total_atoms = sum(natoms)
+
+        try:
+            c_symbol_index = atom_symbols.index('C')
+        except ValueError:
+            print("Error: 'C' (Carbon) not found in atom symbols line:", lines[5].strip())
+            return None, None, None
+
+        start_indices = [0] + list(np.cumsum(natoms[:-1]))
+        carbon_start_index = start_indices[c_symbol_index]
+        num_carbon = natoms[c_symbol_index]
+        carbon_indices = list(range(carbon_start_index, carbon_start_index + num_carbon))
+
+        line_index = 7
+        if lines[line_index].strip().lower().startswith('s'):
+            line_index += 1
+        coord_type_line = lines[line_index].strip().lower()
+        is_direct = coord_type_line.startswith('d') or coord_type_line.startswith('f')
+
+        coord_start_line = line_index + 1
+        if coord_start_line + total_atoms > len(lines):
+            print(f"Error: Not enough coordinate lines in {filename}. Expected {total_atoms}, found {len(lines) - coord_start_line}.")
+            return None, None, None
+
+        coords = []
+        coord_lines = lines[coord_start_line:coord_start_line + total_atoms]
+        for i, line in enumerate(coord_lines):
+            parts = line.split()
+            if len(parts) >= 3:
+                coords.append(list(map(float, parts[:3])))
+            else:
+                print(f"Error: Malformed coordinate line {coord_start_line + i + 1} in {filename}: {line.strip()}")
+                return None, None, None
+        coords = np.array(coords)
+
+        if not is_direct:
+            inv_lattice = np.linalg.inv(lattice)
+            frac_coords = np.dot(coords, inv_lattice)
+        else:
+            frac_coords = coords
+
+        frac_coords = frac_coords % 1.0
+
+    except (ValueError, IndexError) as e:
+        print(f"Error parsing CONTCAR file {filename}: {e}")
+        return None, None, None
+
+    return lattice, coords, carbon_indices
+
+def min_image_distance(frac1, frac2, lattice):
+    """
+    Calculate the minimum image distance between two atoms under periodic boundary conditions.
+    """
+    df = frac2 - frac1
+    df -= np.rint(df)
+    dc = np.dot(df, lattice)
+    return np.linalg.norm(dc)
+
+def find_adjacent_pairs(frac_coords, carbon_indices, lattice, cutoff=1.6):
+    """
+    Identify pairs of adjacent carbon atoms based on a distance cutoff.
+    """
+    if frac_coords is None or carbon_indices is None or lattice is None:
+        print("Error: Invalid input to find_adjacent_pairs.")
+        return None
+    if cutoff <= 0:
+        print("Warning: Cutoff distance must be positive.")
+        return []
+
+    pairs = []
+    num_carbon_atoms = len(carbon_indices)
+    for i in range(num_carbon_atoms):
+        for j in range(i + 1, num_carbon_atoms):
+            idx1 = carbon_indices[i]
+            idx2 = carbon_indices[j]
+            if idx1 >= len(frac_coords) or idx2 >= len(frac_coords):
+                print(f"Warning: Carbon index out of bounds ({idx1} or {idx2} >= {len(frac_coords)}). Skipping pair.")
+                continue
+            dist = min_image_distance(frac_coords[idx1], frac_coords[idx2], lattice)
+            if dist < cutoff:
+                pairs.append((idx1, idx2))
+    return pairs
+
+def split_doscar(doscar_path, output_folder):
+    """
+    Splits a VASP DOSCAR file into individual DOS files, formatted to match the HPC script.
+    """
+    outcar_path = os.path.join(output_folder, 'OUTCAR')
+    if not os.path.exists(outcar_path):
+        messagebox.showerror("Error", f"OUTCAR file not found at: {outcar_path}")
+        return 0, "Error: OUTCAR not found."
+    
+    # Read EFERMI and ISPIN from OUTCAR
+    efermi = 0.0
+    nspin = 1
+    try:
+        with open(outcar_path, 'r') as f:
+            for line in f:
+                if 'E-fermi' in line:
+                    efermi = float(line.split()[2])
+                if 'ISPIN' in line:
+                    nspin = int(line.split()[2])
+    except Exception as e:
+        messagebox.showerror("Error", f"Could not parse OUTCAR for EFERMI/ISPIN: {e}")
+        return 0, "Error parsing OUTCAR."
+    
+    # Read DOSCAR header
+    with open(doscar_path, 'r') as f:
+        lines = f.readlines()
+    
+    try:
+        natom = int(lines[0].split()[0])
+        nedos = int(lines[5].split()[2])
+    except (ValueError, IndexError):
+        return 0, "Error: Could not parse DOSCAR header."
+
+    current_line = 6 + nedos
+    
+    # Process atomic projected DOS
+    positions_info = read_contcar(os.path.join(output_folder, 'CONTCAR'))
+    if positions_info is None:
+        return 0, "Error: Could not read CONTCAR for atomic positions."
+
+    positions = positions_info[1] # The second return value is the list of coordinates
+    
+    atom_index = 1
+    split_count = 0
+    while current_line < len(lines):
+        if current_line + nedos > len(lines):
+            break
+
+        atomic_dos_lines = lines[current_line + 1:current_line + 1 + nedos]
+        
+        dos_file_path = os.path.join(output_folder, f'DOS{atom_index}')
+        with open(dos_file_path, 'w') as outf:
+            if positions is not None and len(positions) >= atom_index:
+                pos = positions[atom_index - 1]
+                # Corrected format string for writing individual elements of the NumPy array
+                outf.write(f"# {pos[0]:12.8f} {pos[1]:12.8f} {pos[2]:12.8f}\n")
+            
+            for line in atomic_dos_lines:
+                fields = line.split()
+                # Apply EFERMI shift
+                energy = float(fields[0]) - efermi
+                if nspin == 2:
+                    # Case for ISPIN = 2 (spin-polarized)
+                    output = [energy]
+                    for j in range(1, 10):
+                        up = float(fields[2 * j - 1])
+                        down = -float(fields[2 * j])
+                        output.extend([up, down])
+                    outf.write(" ".join(f"{val:12.8f}" for val in output) + "\n")
+                else:
+                    # Case for ISPIN = 1 (non-spin-polarized)
+                    output = [energy] + [float(fields[j]) for j in range(1, 10)]
+                    outf.write(" ".join(f"{val:12.8f}" for val in output) + "\n")
+        
+        current_line += 1 + nedos
+        atom_index += 1
+        split_count += 1
+
+    if natom != split_count:
+        return split_count, f"Warning: Expected {natom} atoms, but split {split_count} PDOS files."
+        
+    return natom, None
+
+
+# Function to read DOS files
+def read_dos_files(folder_path, n):
+    """Reads DOS files (DOS1 to DOSn) from the specified folder."""
+    dos_files = []
+    for i in range(1, n + 1):
+        dos_file_name = f'DOS{i}'
+        dos_file_path = os.path.join(folder_path, dos_file_name)
+        if os.path.isfile(dos_file_path):
+            dos_files.append(dos_file_path)
+    return dos_files
+
+# Function to calculate overpotential (ORR)
+def calculate_overpotential_orr(del_goh):
+    """Calculates overpotential based on ORR Del_Goh value."""
+    if del_goh < 0.13914:
+        return 0.3672 - 0.8268 * del_goh
+    else:
+        return 0.11252 + 0.98707 * del_goh
+        
+# Function to calculate overpotential (OER)
+def calculate_overpotential_oer(del_goh_minus_del_go):
+    """
+    Calculate overpotential based on OER DelGoh_minus_DelGo value.
+    """
+    if del_goh_minus_del_go < 2.31212:
+        return 2.3612 - 0.6811 * del_goh_minus_del_go
+    else:
+        return 2.032 + 1 * del_goh_minus_del_go
+
+def compute_pz_parameters(dos_file):
+    """
+    Compute pz_fermi and pz_occ from a VASP DOS file using p_z orbital data.
+    Assumes Fermi level is at 0 eV.
+    """
+    try:
+        dos_data = pd.read_csv(dos_file, header=None, delim_whitespace=True, comment='#')
+        pz_up_col = 5
+        pz_down_col = 6
+        
+        if dos_data.shape[1] <= max(pz_up_col, pz_down_col):
+            return 0.0, 0.0, f"Error: File '{os.path.basename(dos_file)}' has insufficient columns for PDOS analysis."
+
+        energy = dos_data.iloc[:, 0].values
+        dos_pz_up = dos_data.iloc[:, pz_up_col].values
+        dos_pz_down = dos_data.iloc[:, pz_down_col].values
+        pz = dos_pz_up - dos_pz_down
+
+        negative_mask = energy < 0
+        if np.any(negative_mask):
+            neg_indices = np.where(negative_mask)[0]
+            if neg_indices.size > 0:
+                idx_of_max_neg_energy = neg_indices[np.argmax(energy[neg_indices])]
+                pz_fermi = pz[idx_of_max_neg_energy]
+                sort_indices = np.argsort(energy[negative_mask])
+                pz_occ = np.trapz(pz[negative_mask][sort_indices], energy[negative_mask][sort_indices])
+            else:
+                return 0.0, 0.0, f"Warning: File '{os.path.basename(dos_file)}' has no negative energy points."
+        else:
+            return 0.0, 0.0, f"Warning: File '{os.path.basename(dos_file)}' has no energy points below 0 eV."
+        return pz_fermi, pz_occ, None
+    except FileNotFoundError:
+        return 0.0, 0.0, f"Error: DOS file '{os.path.basename(dos_file)}' not found."
+    except pd.errors.EmptyDataError:
+        return 0.0, 0.0, f"Error: DOS file '{os.path.basename(dos_file)}' is empty or unreadable."
+    except Exception as e:
+        return 0.0, 0.0, f"Error processing file '{os.path.basename(dos_file)}': {e}"
+
+def run_ml_analysis(folder_path, n_atoms, reaction_type):
+    """
+    Performs the ML analysis based on the specified reaction type (OER or ORR).
+    """
+    model_method = ml_method_var.get()
+    
+    if model_method == "SVR":
+        model_key = reaction_type + "_SVR"
+        if model_key not in trained_models:
+            messagebox.showerror("Error", f"Training model for '{model_key}' not found. Please ensure training data exists.")
+            return None, None, None
+        model_data = trained_models[model_key]
+        model = model_data['model']
+        scaler_X = model_data['scaler_X']
+        scaler_y = model_data['scaler_y']
+        
+        if reaction_type == "ORR":
+            return analyze_orr_ml(folder_path, n_atoms, model, scaler_X, scaler_y)
+        elif reaction_type == "OER":
+            return analyze_oer_ml(folder_path, n_atoms, model, scaler_X, scaler_y)
+            
+    elif model_method == "MLR":
+        model_key = reaction_type + "_MLR"
+        if model_key not in trained_models:
+            messagebox.showerror("Error", f"Training model for '{model_key}' not found. Please ensure training data exists.")
+            return None, None, None
+        model_data = trained_models[model_key]
+        model = model_data['model']
+        scaler_X = model_data['scaler_X']
+        scaler_y = model_data['scaler_y']
+        
+        if reaction_type == "ORR":
+            return analyze_orr_ml(folder_path, n_atoms, model, scaler_X, scaler_y, method="MLR")
+        elif reaction_type == "OER":
+            return analyze_oer_ml(folder_path, n_atoms, model, scaler_X, scaler_y, method="MLR")
+
+def analyze_orr_ml(folder_path, n, model, sc_X, sc_y, method="SVR"):
+    """Performs ORR analysis using an SVR or MLR model."""
+    dos_files = [os.path.join(folder_path, f'DOS{i}') for i in range(1, n + 1) if os.path.exists(os.path.join(folder_path, f'DOS{i}'))]
+    if not dos_files:
+        return "No DOS files found.", None, None
+
+    # Corrected DataFrame columns
+    results_df = pd.DataFrame(columns=['File', 'Pz_Occupancy', 'Pz_at_Fermi', 'r_Occupancy', 'Del_Goh', 'Overpotential'])
+    warnings = []
+    
+    for dos_file in dos_files:
+        pz_fermi, pz_occ, err = compute_pz_parameters(dos_file)
+        if err:
+            warnings.append(f"Skipping {os.path.basename(dos_file)} due to an error: {err}")
+            continue
+        
+        # Calculate the new input feature r_occ
+        r_occ = pz_occ - 0.47064
+
+        # The input features for the SVR model are r_occ and pz_fermi
+        input_features = np.array([[r_occ, pz_fermi]])
+        scaled_features = sc_X.transform(input_features)
+        
+        predicted_del_goh_scaled = model.predict(scaled_features)
+        del_goh = sc_y.inverse_transform(predicted_del_goh_scaled.reshape(-1, 1))[0][0]
+
+        overpotential = calculate_overpotential_orr(del_goh)
+        
+        # Correctly insert data into the DataFrame
+        results_df.loc[len(results_df)] = [dos_file, pz_occ, pz_fermi, r_occ, del_goh, overpotential]
+    
+    if results_df.empty:
+        return "No valid DOS files were processed.", None, None
+
+    output_str = f"Analysis for ORR using {method}\n\n"
+    if warnings:
+        output_str += "--- Warnings ---\n" + "\n".join(warnings) + "\n\n"
+    output_str += results_df[['File', 'Del_Goh', 'Overpotential']].to_string()
+    
+    excel_file_path = os.path.join(folder_path, 'dos_results.xlsx')
+    results_df.to_excel(excel_file_path, index=False)
+    
+    csv_file_path = os.path.join(folder_path, f'overpotentialsORR_{method}.csv')
+    results_df.to_csv(csv_file_path, index=False)
+    
+    return output_str, excel_file_path, csv_file_path
+
+def analyze_oer_ml(folder_path, n_atoms, model, sc_X, sc_y, method="SVR"):
+    """
+    Performs OER analysis using an SVR or MLR model and a CONTCAR file.
+    """
+    contcar_file = os.path.join(folder_path, 'CONTCAR')
+    lattice, coords, carbon_indices = read_contcar(contcar_file)
+    if lattice is None or coords is None or carbon_indices is None:
+        return "Error: CONTCAR file not found or could not be parsed.", None, None
+    
+    pairs_0based = find_adjacent_pairs(coords, carbon_indices, lattice, cutoff=1.6)
+    if pairs_0based is None:
+        return "Error: Could not find adjacent carbon pairs.", None, None
+
+    s_params_by_list_idx = {}
+    
+    # Get a list of original atom indices that have valid DOS files
+    existing_dos_indices = [idx for idx in carbon_indices if os.path.exists(os.path.join(folder_path, f'DOS{idx + 1}'))]
+
+    # Process only the existing PDOS files for carbon atoms
+    for original_idx in existing_dos_indices:
+        dos_file = os.path.join(folder_path, f'DOS{original_idx + 1}')
+        pz_fermi_s, pz_occ_s, err = compute_pz_parameters(dos_file)
+        if not err:
+            # Calculate the new r_occ_s parameter
+            r_occ_s = pz_occ_s - 0.47064
+            s_params_by_list_idx[original_idx] = {'pz_fermi_s': pz_fermi_s, 'pz_occ_s': pz_occ_s, 'r_occ_s': r_occ_s}
+
+    if not s_params_by_list_idx:
+        return "No valid DOS files for carbon atoms were processed.", None, None
+
+    # Map original indices to a new list for adjacency list creation
+    original_idx_to_list_idx = {orig_idx: list_idx for list_idx, orig_idx in enumerate(carbon_indices)}
+    adj_list = {i: [] for i in range(len(carbon_indices))}
+    
+    # Build the adjacency list for existing carbon atoms
+    for idx1_orig, idx2_orig in pairs_0based:
+        if idx1_orig in original_idx_to_list_idx and idx2_orig in original_idx_to_list_idx:
+            list_idx1 = original_idx_to_list_idx[idx1_orig]
+            list_idx2 = original_idx_to_list_idx[idx2_orig]
+            adj_list[list_idx1].append(list_idx2)
+            adj_list[list_idx2].append(list_idx1)
+
+    results_for_csv = []
+    
+    # Iterate through the original carbon indices, but use data only from the ones that were processed
+    for i in range(len(carbon_indices)):
+        original_idx = carbon_indices[i]
+        if original_idx not in s_params_by_list_idx:
+            continue
+            
+        pz_fermi_s_i = s_params_by_list_idx[original_idx]['pz_fermi_s']
+        pz_occ_s_i_orig = s_params_by_list_idx[original_idx]['pz_occ_s']
+        r_occ_s_i = s_params_by_list_idx[original_idx]['r_occ_s']
+        
+        list_index = original_idx_to_list_idx[original_idx]
+        neighbor_list_indices = adj_list[list_index]
+
+        max_del_g_for_i = -np.inf
+        best_pz_fermi_d_for_i = pz_fermi_s_i
+        best_pz_occ_d_for_i_orig = pz_occ_s_i_orig
+        best_r_occ_d_for_i = r_occ_s_i
+        calculated_del_g = None
+
+        if neighbor_list_indices:
+            for j in neighbor_list_indices:
+                neighbor_original_idx = carbon_indices[j]
+                if neighbor_original_idx not in s_params_by_list_idx:
+                    continue
+                pz_fermi_s_j = s_params_by_list_idx[neighbor_original_idx]['pz_fermi_s']
+                pz_occ_s_j_orig = s_params_by_list_idx[neighbor_original_idx]['pz_occ_s']
+                r_occ_s_j = s_params_by_list_idx[neighbor_original_idx]['r_occ_s']
+                
+                # Create the D parameters from the pair using the corrected values
+                pz_fermi_d_pair = pz_fermi_s_i + pz_fermi_s_j
+                pz_occ_d_pair_orig = pz_occ_s_i_orig + pz_occ_s_j_orig
+                r_occ_d_pair = r_occ_s_i + r_occ_s_j
+
+                # Form the feature vector for prediction with the corrected inputs
+                input_features = np.array([[pz_fermi_s_i, r_occ_s_i, pz_fermi_d_pair, r_occ_d_pair]])
+                scaled_features = sc_X.transform(input_features)
+                predicted_del_g_scaled = model.predict(scaled_features)
+                predicted_del_g = sc_y.inverse_transform(predicted_del_g_scaled.reshape(-1, 1))[0][0]
+
+                if predicted_del_g > max_del_g_for_i:
+                    max_del_g_for_i = predicted_del_g
+                    best_pz_fermi_d_for_i = pz_fermi_d_pair
+                    best_pz_occ_d_for_i_orig = pz_occ_d_pair_orig
+                    best_r_occ_d_for_i = r_occ_d_pair
+            calculated_del_g = max_del_g_for_i
+        else:
+            # Use single parameters for D if no neighbors
+            input_features = np.array([[pz_fermi_s_i, r_occ_s_i, pz_fermi_s_i, r_occ_s_i]])
+            scaled_features = sc_X.transform(input_features)
+            predicted_del_g_scaled = model.predict(scaled_features)
+            calculated_del_g = sc_y.inverse_transform(predicted_del_g_scaled.reshape(-1, 1))[0][0]
+            best_pz_fermi_d_for_i = pz_fermi_s_i
+            best_pz_occ_d_for_i_orig = pz_occ_s_i_orig
+            best_r_occ_d_for_i = r_occ_s_i
+        
+        overpotential = calculate_overpotential_oer(calculated_del_g)
+        
+        results_for_csv.append({
+            'Atom_Number': original_idx + 1, # Use original atom number
+            'Pz_Fermi_S': pz_fermi_s_i,
+            'Pz_Occ_S': pz_occ_s_i_orig,
+            'r_Occ_S': r_occ_s_i,
+            'Pz_Fermi_D_maxG': best_pz_fermi_d_for_i,
+            'Pz_Occ_D_maxG': best_pz_occ_d_for_i_orig,
+            'r_Occ_D_maxG': best_r_occ_d_for_i,
+            'Max_DelGoh_minus_DelGo': calculated_del_g,
+            'Overpotential': overpotential
+        })
+    
+    if not results_for_csv:
+        return "No valid data was available for analysis. Check your input files.", None, None
+
+    output_str = f"Analysis for OER using {method}\n\n"
+    output_str += pd.DataFrame(results_for_csv)[['Atom_Number', 'Max_DelGoh_minus_DelGo', 'Overpotential']].to_string(index=False)
+
+    excel_file_path = os.path.join(folder_path, 'dos_results.xlsx')
+    pd.DataFrame(results_for_csv).to_excel(excel_file_path, index=False)
+    
+    csv_file_path = os.path.join(folder_path, f'overpotentialsOER_{method}.csv')
+    pd.DataFrame(results_for_csv).to_csv(csv_file_path, index=False)
+
+    return output_str, excel_file_path, csv_file_path
+
+# Placeholder for DFT analysis
+def analyze_dft_vasp(folder_path, n_atoms, reaction_type):
+    """Placeholder for DFT VASP analysis."""
+    output_str = f"DFT (VASP) analysis for {reaction_type} is not yet implemented.\n"
+    return output_str, None, None
+
+def analyze_dft_qe(folder_path, n_atoms, reaction_type):
+    """Placeholder for DFT Quantum Espresso analysis."""
+    output_str = f"DFT (Quantum Espresso) analysis for {reaction_type} is not yet implemented.\n"
+    return output_str, None, None
+
+def analyze_ml_method(file_path, ml_method):
+    """Placeholder for general ML analysis on a CSV file."""
+    output_str = f"ML analysis for {os.path.basename(file_path)} using {ml_method} is not yet implemented."
+    return output_str, None, None
+
+
+
+# === GUI LOGIC
+
+
+# Global variables
+uploaded_file_path = None
+output_directory = None
+excel_file_path = None
+csv_file_path = None
+active_analysis_type = 'DFT'
+
+# Upload file function
+def upload_file():
+    global uploaded_file_path, output_directory
+    
+    file_path = None
+    # The selection of which file to upload is based on the active analysis type.
+    if active_analysis_type == "DFT" or active_analysis_type == "Machine Learning":
+        # For both DFT (VASP) and ML, the primary input is the DOSCAR file.
+        file_path = filedialog.askopenfilename(title="Select DOSCAR file",
+                                               filetypes=[("DOSCAR files", "DOSCAR"), ("All files", "*.*")])
+    else:
+        # Fallback for other analysis types, though not implemented yet.
+        file_path = filedialog.askopenfilename(title="Select File",
+                                               filetypes=[("All files", "*.*")])
+    
+    if file_path:
+        uploaded_file_path = file_path
+        output_directory = os.path.dirname(uploaded_file_path)
+        output_text.delete(1.0, tk.END)
+        output_text.insert(tk.END, f"File uploaded: {os.path.basename(file_path)}\n")
+        run_button.config(state="normal")
+        reset_results()
+    else:
+        # Don't show a messagebox if no file is selected for Quantum Espresso
+        if method_var.get() != "Quantum Espresso":
+             messagebox.showwarning("Info", "No file selected.")
+
+# Run analysis function
+def run_analysis():
+    global output_directory, excel_file_path, csv_file_path
+    if not uploaded_file_path:
+        messagebox.showerror("Error", "Please upload a file first")
+        return
+    
+    if not output_directory:
+        # If no output directory is set, use the directory of the uploaded file
+        if not uploaded_file_path:
+            messagebox.showwarning("Info", "No output folder selected. Please upload a file first.")
+            return
+        output_directory = os.path.dirname(uploaded_file_path)
+
+    output_str, excel_path, csv_path = None, None, None
+    method = method_var.get()
+    ml_method = ml_method_var.get()
+    
+    try:
+        # The core logic for handling files and running analysis has been moved here
+        # to ensure it's executed regardless of which method is selected.
+        doscar_source = uploaded_file_path
+        source_directory = os.path.dirname(doscar_source)
+        
+        # Check for existence of all necessary files first
+        outcar_source = os.path.join(source_directory, "OUTCAR")
+        if not os.path.exists(outcar_source):
+            messagebox.showerror("Error", f"OUTCAR file not found in the source directory: {source_directory}")
+            return
+            
+        if reaction_var.get() == "OER":
+            contcar_source = os.path.join(source_directory, "CONTCAR")
+            if not os.path.exists(contcar_source):
+                messagebox.showerror("Error", f"CONTCAR file is required for OER analysis and was not found in: {source_directory}")
+                return
+
+        # Use the determined output directory. No need to copy if it's the same.
+        doscar_path_for_analysis = os.path.join(output_directory, "DOSCAR")
+
+        # Copy files to output directory if it's different from the source directory
+        if os.path.abspath(source_directory) != os.path.abspath(output_directory):
+            if os.path.exists(doscar_source):
+                shutil.copy(doscar_source, os.path.join(output_directory, "DOSCAR"))
+            if os.path.exists(outcar_source):
+                shutil.copy(outcar_source, os.path.join(output_directory, "OUTCAR"))
+            if reaction_var.get() == "OER" and os.path.exists(contcar_source):
+                shutil.copy(contcar_source, os.path.join(output_directory, "CONTCAR"))
+        else:
+            # If the source and output directories are the same, just use the local file paths
+            pass
+        
+        # Now run the split doscar function on the files in the output directory
+        n_atoms, split_error_msg = split_doscar(doscar_path_for_analysis, output_directory)
+        
+        if split_error_msg:
+            output_text.insert(tk.END, f"Warning: {split_error_msg}\n")
+        if n_atoms == 0:
+            messagebox.showerror("Error", "Could not split DOSCAR into individual DOS files.")
+            return
+        
+        # Now, based on the GUI state, we run the selected analysis
+        if active_analysis_type == "DFT":
+            if method == "VASP":
+                output_str, excel_path, csv_path = run_ml_analysis(output_directory, n_atoms, reaction_var.get())
+            elif method == "Quantum Espresso":
+                # Modified to update the output text area instead of a messagebox
+                output_str = "Quantum Espresso analysis is not yet implemented. Please select VASP or switch to ML analysis."
+                output_text.delete(1.0, tk.END)
+                output_text.insert(tk.END, output_str)
+                run_button.config(state="disabled")
+                return
+            
+        elif active_analysis_type == "Machine Learning":
+            reaction = reaction_var.get()
+            # For ML analysis on CSV, n_atoms is not needed, but pass a placeholder value.
+            output_str, excel_path, csv_path = run_ml_analysis(output_directory, n_atoms, reaction)
+
+    except Exception as e:
+        messagebox.showerror("Analysis Error", f"An error occurred during analysis: {e}")
+        output_str = f"Analysis failed. Please check your input file and selections.\n\nError: {e}"
+
+    if output_str is None:
+        messagebox.showerror("Analysis Error", "The analysis returned no results. Check the input files and console for warnings.")
+    else:
+        output_text.delete(1.0, tk.END)
+        output_text.insert(tk.END, output_str)
+        # Correctly assign the returned paths
+        excel_file_path = excel_path
+        csv_file_path = csv_path
+        
+    update_download_button_labels()
+    update_download_buttons_state()
+
+
+def update_download_button_labels():
+    ml_method = ml_method_var.get()
+    reaction_type = reaction_var.get()
+    
+    if reaction_type == "OER":
+        download_csv_button.config(text=f"Download overpotentialsOER_{ml_method}.csv")
+    elif reaction_type == "ORR":
+        download_csv_button.config(text=f"Download overpotentialsORR_{ml_method}.csv")
+        
+def reset_results():
+    global excel_file_path, csv_file_path
+    excel_file_path = None
+    csv_file_path = None
+    update_download_buttons_state()
+
+def update_download_buttons_state():
+    download_excel_button.config(state="normal" if excel_file_path and os.path.exists(excel_file_path) else "disabled")
+    download_csv_button.config(state="normal" if csv_file_path and os.path.exists(csv_file_path) else "disabled")
+
+def download_file(file_path, file_type):
+    if not file_path or not os.path.exists(file_path):
+        messagebox.showerror("Error", f"No {file_type.upper()} file to download or file path is invalid.")
+        return
+    save_path = filedialog.asksaveasfilename(defaultextension=f".{file_type}",
+                                             initialfile=os.path.basename(file_path),
+                                             filetypes=[(f"{file_type.upper()} files", f"*.{file_type}")])
+    if save_path:
+        try:
+            shutil.copy(file_path, save_path)
+            messagebox.showinfo("Success", f"{file_type.upper()} file downloaded successfully to:\n{save_path}")
+        except Exception as e:
+            messagebox.showerror("Download Error", f"Could not save the file. Error: {e}")
+
+def download_excel():
+    download_file(excel_file_path, "xlsx")
+
+def download_csv():
+    download_file(csv_file_path, "csv")
+
+def set_active_analysis(type_name):
+    global active_analysis_type, uploaded_file_path
+    if active_analysis_type != type_name:
+        active_analysis_type = type_name
+        if uploaded_file_path:
+            uploaded_file_path = None
+            output_text.delete(1.0, tk.END)
+            output_text.insert(tk.END, f"Analysis type changed to {type_name}. Please upload a new file.")
+            run_button.config(state="disabled")
+            reset_results()
+    update_ui_state()
+
+def update_ui_state():
+    if active_analysis_type == "DFT":
+        dft_frame.config(style='Active.TLabelframe')
+        ml_frame.config(style='Inactive.TLabelframe')
+        method_dropdown.config(state="readonly")
+        reaction_dropdown.config(state="readonly")
+        ml_method_dropdown.config(state="disabled")
+    elif active_analysis_type == "Machine Learning":
+        dft_frame.config(style='Inactive.TLabelframe')
+        ml_frame.config(style='Active.TLabelframe')
+        method_dropdown.config(state="disabled")
+        reaction_dropdown.config(state="readonly")
+        ml_method_dropdown.config(state="readonly")
+    else:
+        dft_frame.config(style='Inactive.TLabelframe')
+        ml_frame.config(style='Inactive.TLabelframe')
+        method_dropdown.config(state="disabled")
+        reaction_dropdown.config(state="disabled")
+        ml_method_dropdown.config(state="disabled")
+        
+root = tk.Tk()
+root.title("Padarth Khoj App")
+root.geometry("1000x800")
+root.configure(bg='#f5f5f5')
+
+style = ttk.Style()
+style.theme_use('clam')
+style.configure('TButton', background='#007bff', foreground='white', font='Arial 12 bold', padding=10)
+style.map('TButton', background=[('active', '#0056b3'), ('disabled', '#c0c0c0')])
+style.configure('TCombobox', fieldbackground='white', background='white', foreground='#333333')
+style.configure('TLabel', background='#f5f5f5', foreground='#333333', font='Arial 10')
+style.configure('TFrame', background='#f5f5f5')
+
+style.configure('Inactive.TLabelframe', background='#f5f5f5')
+style.configure('Inactive.TLabelframe.Label', background='#f5f5f5', font='Arial 10 bold', foreground='grey')
+
+style.configure('Active.TLabelframe', background='#f5f5f5')
+style.configure('Active.TLabelframe.Label', background='#f5f5f5', font='Arial 10 bold', foreground='#007bff')
+
+
+main_frame = ttk.Frame(root, padding=20)
+main_frame.pack(fill='both', expand=True)
+
+header_frame = tk.Frame(main_frame, bg='#ff69b4')
+header_frame.pack(fill='x', pady=(0, 20))
+header_label = tk.Label(header_frame, text="Padarth Khoj App", font='Arial 18 bold', bg='#ff69b4', fg='white')
+header_label.pack(pady=10)
+
+dft_frame = ttk.LabelFrame(main_frame, text="Select Method (DFT)")
+dft_frame.pack(fill='x', expand=True, pady=5)
+
+method_var = tk.StringVar(value="VASP")
+method_dropdown = ttk.Combobox(dft_frame, textvariable=method_var,
+                               values=["VASP", "Quantum Espresso"],
+                               state="readonly", width=20)
+method_dropdown.grid(row=0, column=0, padx=10, pady=10, sticky='w')
+method_dropdown.bind("<<ComboboxSelected>>", lambda e: set_active_analysis("DFT"))
+method_dropdown.bind("<Button-1>", lambda e: set_active_analysis("DFT"))
+
+
+reaction_var = tk.StringVar(value="OER")
+reaction_label = ttk.Label(dft_frame, text="Select Reaction:")
+reaction_label.grid(row=0, column=1, padx=(20, 10), pady=10, sticky='w')
+reaction_dropdown = ttk.Combobox(dft_frame, textvariable=reaction_var,
+                                 values=["OER", "ORR"], state="readonly", width=15)
+reaction_dropdown.grid(row=0, column=2, padx=0, pady=10, sticky='w')
+reaction_dropdown.bind("<Button-1>", lambda e: set_active_analysis("DFT"))
+
+
+ml_frame = ttk.LabelFrame(main_frame, text="Select ML Method")
+ml_frame.pack(fill='x', expand=True, pady=10)
+
+ml_method_var = tk.StringVar(value="SVR")
+ml_method_dropdown = ttk.Combobox(ml_frame, textvariable=ml_method_var,
+                                 values=["MLR", "SVR"],
+                                 state="readonly", width=20)
+ml_method_dropdown.grid(row=0, column=0, padx=10, pady=10, sticky='w')
+ml_method_dropdown.bind("<<ComboboxSelected>>", lambda e: set_active_analysis("Machine Learning"))
+ml_method_dropdown.bind("<Button-1>", lambda e: set_active_analysis("Machine Learning"))
+
+
+separator1 = ttk.Separator(main_frame, orient='horizontal')
+separator1.pack(fill='x', pady=20)
+
+action_frame = ttk.Frame(main_frame)
+action_frame.pack(pady=10)
+
+upload_button = ttk.Button(action_frame, text="Upload File", command=upload_file, width=15)
+upload_button.pack(side='left', padx=10)
+
+run_button = ttk.Button(action_frame, text="Run Analysis", command=run_analysis, width=15, state="disabled")
+run_button.pack(side='left', padx=10)
+
+output_frame = ttk.Frame(main_frame)
+output_frame.pack(fill='both', expand=True, pady=10)
+
+output_text = tk.Text(output_frame, height=15, width=70, bg='white', fg='#333333', font='Arial 10', wrap='word')
+output_text.pack(side='left', fill='both', expand=True)
+
+scrollbar = tk.Scrollbar(output_frame, command=output_text.yview)
+scrollbar.pack(side='right', fill='y')
+output_text.config(yscrollcommand=scrollbar.set)
+
+separator2 = ttk.Separator(main_frame, orient='horizontal')
+separator2.pack(fill='x', pady=10)
+
+download_frame = ttk.Frame(main_frame)
+download_frame.pack(pady=10)
+
+download_excel_button = ttk.Button(download_frame, text="Download dos_results.xlsx", command=download_excel, width=25)
+download_excel_button.pack(side='left', padx=10)
+
+download_csv_button = ttk.Button(download_frame, text="Download overpotentials.csv", command=download_csv, width=25)
+download_csv_button.pack(side='left', padx=10)
+
+update_ui_state()
+reset_results()
+
+train_oer_model()
+train_orr_model()
+train_oer_mlr_model()
+train_orr_mlr_model()
+
+root.mainloop()
