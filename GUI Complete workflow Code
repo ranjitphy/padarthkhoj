@@ -1,3 +1,5 @@
+# Author: <Arupjyoti Pathak>, <Ranjit Thapa*>
+# Affiliation: SRM University AP
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 import os
