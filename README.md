@@ -47,7 +47,7 @@ GitHub Pages cannot host this app because it needs a Python backend; use any hos
  
 ## Padarth Khoj Tool
 ## Developer: Sourav Ghosh
-Link: https://coderontheroad.github.io/padarthkhoj-tools/
+Link: .(https://coderontheroad.github.io/padarthkhoj-tools/).
 
 ## Hosting it for other people
 
