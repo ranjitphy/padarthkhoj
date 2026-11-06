@@ -1,0 +1,10 @@
+numpy>=1.23
+pandas>=1.5
+scikit-learn>=1.2
+openpyxl>=3.0
+# DOS Predictor (stage 1 + stage 2 PDOS networks)
+torch>=2.1
+ase>=3.22
+matplotlib>=3.6
+# Structure Relaxor (VASP-style interface to MACE; pulls in mace-torch)
+vasp-mace>=2.9

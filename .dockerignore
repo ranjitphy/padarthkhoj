@@ -1,0 +1,6 @@
+.git
+.venv
+.padarth-data
+__pycache__
+tests
+*.md

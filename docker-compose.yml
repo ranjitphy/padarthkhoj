@@ -1,0 +1,9 @@
+services:
+  padarthkhoj:
+    build: .
+    ports: ["8000:8000"]
+    environment:
+      PK_MAX_SESSIONS: "6"     # engine processes alive at once
+      PK_MAX_JOBS: "2"         # heavy jobs at once
+      PK_MAX_NSW: "500"        # cap on relaxation steps
+    restart: unless-stopped

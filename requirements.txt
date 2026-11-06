@@ -1,0 +1,5 @@
+# Web server
+fastapi>=0.110
+uvicorn>=0.29
+# Engine (Activity Screening, DOS Predictor, Structure Relaxor)
+-r engine/requirements.txt
