@@ -83,10 +83,12 @@ engine/           Python engine (engine.py, dos_predictor.py, relaxor.py, relax_
 tests/            engine, browser and security tests
 ```
 
-## Credits
+## Credits and Padarth Khoj Tool
 
-- Founder: Prof. Ranjit Thapa. Developer: Mr. Arupjyoti Pathak.
+- Founder: PROF. RANJIT THAPA. Main Line Developer: ARUPJYOTI PATHAK.
 - Source: <https://github.com/ranjitphy/padarthkhoj>
+- Padarth Khoj Tool: <https://coderontheroad.github.io/padarthkhoj-tools/>
+- Developer of Padarth Khoj Tool: SOURAV GHOSH
 
 ## Citation of the Structure Relaxor components
 
@@ -96,11 +98,6 @@ If you use the Structure Relaxor, please cite:
 - Batatia, I.; Kovacs, D. P.; Simm, G. N. C.; Ortner, C.; Csanyi, G. MACE: Higher Order Equivariant Message Passing Neural Networks for Fast and Accurate Force Fields. NeurIPS 2022.
 - Batatia, I. et al. Cross Learning between Electronic Structure Theories for Unifying Molecular, Surface, and Inorganic Crystal Foundation Force Fields. arXiv:2510.25380 (2025) (MACE-MH-1; released under the ASL, Academic Software License).
 - Batatia, I. et al. A foundation model for atomistic materials chemistry. J. Chem. Phys. 163 (18), 2025 (MACE-MP-0).
-
-## Licence
-
-No licence file is included yet: add one (for example MIT or Apache-2.0) before publishing, otherwise others have no formal right to reuse the code. The trained weights and training data in `engine/` are yours to license separately.
-
 
 ## Note
 The desktop app can use your own Python environment for the Relaxor; the web version never does (the server runs only its own interpreter).
