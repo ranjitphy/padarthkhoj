@@ -44,6 +44,10 @@ GitHub Pages cannot host this app because it needs a Python backend; use any hos
   - Precision: float32 is noticeably faster on CPU; the default is float64 on CPU.
   - The first step is the slowest; importing PyTorch and MACE can take a minute or two the first time. The page shows the current phase and elapsed time.
   - These are surrogate-model results: check important structures with DFT.
+ 
+## Padarth Khoj Tool
+## Developer: Sourav Ghosh
+Link: https://coderontheroad.github.io/padarthkhoj-tools/
 
 ## Hosting it for other people
 
