@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; script-src 'self'">
+  <title>Padarth Khoj</title>
+  <link rel="icon" type="image/png" href="favicon.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app">
+    <header class="app-header">
+      <div class="brand">
+        <img class="logo" src="logo.png" alt="" height="52">
+        <div>
+          <h1 class="app-title">Padarth Khoj</h1>
+          <p class="app-subtitle">Electrocatalyst screening from VASP DOSCAR</p>
+        </div>
+      </div>
+
+      <div class="header-right">
+        <nav class="web-menu" aria-label="About">
+          <details class="web-dd" id="ddTeam">
+            <summary>Team</summary>
+            <div class="dd-pop">
+              <div class="dd-row"><span class="dd-k">Founder</span><span>Prof. Ranjit Thapa</span></div>
+              <div class="dd-row"><span class="dd-k">Developer</span><span>Mr. Arupjyoti Pathak</span></div>
+            </div>
+          </details>
+          <details class="web-dd" id="ddLinks">
+            <summary>Links</summary>
+            <div class="dd-pop">
+              <a href="https://github.com/ranjitphy/padarthkhoj" target="_blank" rel="noopener noreferrer">GitHub: ranjitphy/padarthkhoj</a>
+            </div>
+          </details>
+        </nav>
+        <div id="modelStatusBadge" class="status-badge status-loading" title="">
+          <span class="status-dot"></span>
+          <span id="modelStatusText">Training ML models...</span>
+        </div>
+        <div class="switch-group">
+          <span class="switch-title">Theme</span>
+          <label class="switch-row">
+            <span>dark</span>
+            <input type="checkbox" id="themeSwitch" class="switch" aria-label="Light theme">
+            <span>light</span>
+          </label>
+        </div>
+        <div class="switch-group">
+          <span class="switch-title">Full Screen</span>
+          <label class="switch-row">
+            <span>Windowed</span>
+            <input type="checkbox" id="fullscreenSwitch" class="switch" aria-label="Full screen">
+            <span>Full Screen</span>
+          </label>
+        </div>
+      </div>
+    </header>
+
+    <nav class="section-nav" id="sectionNav" role="tablist" aria-label="Sections">
+      <button type="button" class="section-btn" role="tab" data-section="relax" id="navRelax">Structure Relaxor <span class="soon">desktop only</span></button>
+      <button type="button" class="section-btn active" role="tab" data-section="dos" id="navDos">DOS Predictor</button>
+      <button type="button" class="section-btn" role="tab" data-section="activity" id="navActivity">Activity Screening</button>
+    </nav>
+
+    <div class="section" id="sectionActivity" role="tabpanel">
+    <section class="setup">
+      <section class="panel mode-panel active" id="dftCard">
+        <div class="panel-head">
+          <h2>DFT method</h2>
+          <button type="button" class="chip-btn" id="selectDftBtn">Active</button>
+        </div>
+        <div class="field-row">
+          <label class="field">
+            <span>Engine</span>
+            <select id="methodSelect">
+              <option value="VASP" selected>VASP</option>
+              <option value="Quantum Espresso">Quantum Espresso</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Reaction</span>
+            <select id="reactionSelect">
+              <option value="OER" selected>OER (oxygen evolution)</option>
+              <option value="ORR">ORR (oxygen reduction)</option>
+            </select>
+          </label>
+        </div>
+      </section>
+
+      <section class="panel mode-panel" id="mlCard">
+        <div class="panel-head">
+          <h2>ML method</h2>
+          <button type="button" class="chip-btn" id="selectMlBtn">Activate ML</button>
+        </div>
+        <div class="field-row">
+          <label class="field">
+            <span>Regressor</span>
+            <select id="mlMethodSelect">
+              <option value="SVR" selected>SVR (support vector)</option>
+              <option value="MLR">MLR (multiple linear)</option>
+            </select>
+          </label>
+          <p class="hint" id="mlHint">Trained on p<sub>z</sub> density at E<sub>F</sub> and occupancy of single and dual carbon sites.</p>
+        </div>
+      </section>
+
+      <section class="panel run-panel">
+        <div class="file-line">
+          <button id="uploadBtn" class="btn btn-secondary" type="button">Upload DOSCAR</button>
+          <button id="structBtn" class="btn btn-ghost" type="button" title="View a POSCAR / CONTCAR / xyz without running an analysis">Open structure</button>
+        </div>
+        <div class="file-details" id="fileDetails" aria-live="polite">
+          <span class="file-label">No file selected</span>
+          <span class="file-subtext">Choose the DOSCAR of a finished VASP run. Select the DOSCAR together with CONTCAR and OUTCAR (Ctrl- or Shift-click to pick several files).</span>
+        </div>
+        <div class="run-line">
+          <button id="runBtn" class="btn btn-primary" type="button" disabled>
+            <span class="btn-spinner" aria-hidden="true"></span>
+            <span id="runBtnText">Run analysis</span>
+          </button>
+          <button id="cancelBtn" class="btn btn-ghost" type="button" hidden>Cancel</button>
+          <div class="progress" id="progress" hidden><div class="progress-bar" id="progressBar"></div></div>
+        </div>
+      </section>
+    </section>
+
+    <main class="workspace">
+      <section class="panel results-panel">
+        <div class="pane-head">
+          <div class="tabs" role="tablist">
+            <button class="tab-btn active" role="tab" data-tab="tableView" type="button">Results</button>
+            <button class="tab-btn" role="tab" data-tab="consoleView" type="button">Console</button>
+          </div>
+          <div class="summary" id="summaryPills" hidden>
+            <span class="pill"><span class="pill-title">Sites</span> <b id="summaryCount">0</b></span>
+            <span class="pill best"><span class="pill-title">Best</span> <b id="summaryBest">-</b></span>
+            <span class="pill best"><span class="pill-title">Lowest &eta;</span> <b id="summaryEta">-</b></span>
+          </div>
+        </div>
+        <div class="pane-body">
+          <div id="tableView" class="tab-pane active">
+            <div class="table-tools" id="tableTools" hidden>
+              <label class="check"><input type="checkbox" id="carbonOnly" checked> Carbon sites only</label>
+            </div>
+            <div class="table-container" id="tableContainer">
+              <div class="empty-state" id="emptyTableState">
+                <p>No results yet.</p>
+                <p class="muted">Upload a DOSCAR and choose Run analysis. Predicted overpotentials will list here and colour the structure.</p>
+              </div>
+              <table class="data-table" id="resultsTable" hidden>
+                <thead>
+                  <tr>
+                    <th data-sort="atom" class="sortable">Site</th>
+                    <th data-sort="dg" class="sortable num">&Delta;G (eV)</th>
+                    <th data-sort="eta" class="sortable num sorted">&eta; (V)</th>
+                    <th>Activity</th>
+                  </tr>
+                </thead>
+                <tbody id="resultsTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+          <div id="consoleView" class="tab-pane">
+            <div class="console-box"><pre id="consoleText"></pre></div>
+          </div>
+        </div>
+        <div class="pane-foot">
+          <span class="muted">Export</span>
+          <button id="downloadExcelBtn" class="btn btn-small" type="button" disabled>dos_results.xlsx</button>
+          <button id="downloadCsvBtn" class="btn btn-small" type="button" disabled><span id="downloadCsvLabel">overpotentials.csv</span></button>
+          <button id="openFolderBtn" class="btn btn-small btn-ghost" type="button" disabled>Open output folder</button>
+        </div>
+      </section>
+
+      <section class="panel viewer-panel">
+        <div class="pane-head">
+          <h2 id="structTitle">Structure</h2>
+          <div class="seg" role="group" aria-label="Colour atoms by">
+            <button type="button" class="seg-btn active" data-color="element">Element</button>
+            <button type="button" class="seg-btn" data-color="eta" id="colorEtaBtn" disabled title="Run an analysis first">Overpotential</button>
+          </div>
+        </div>
+        <div class="viewer-stage" id="viewerStage">
+          <canvas id="viewerCanvas" aria-label="3D structure viewer"></canvas>
+          <div class="viewer-views">
+            <button type="button" class="icon-btn" data-view="top" title="Look along c">Top</button>
+            <button type="button" class="icon-btn" data-view="front" title="Look along b">Front</button>
+            <button type="button" class="icon-btn" data-view="side" title="Look along a">Side</button>
+            <button type="button" class="icon-btn" data-view="iso" title="Reset view">Reset</button>
+          </div>
+          <div class="legend" id="legend" hidden>
+            <div class="legend-bar" id="legendBar"></div>
+            <div class="legend-scale"><span id="legendMin"></span><span>&eta; (V)</span><span id="legendMax"></span></div>
+          </div>
+          <div class="atom-info" id="atomInfo" hidden></div>
+          <div class="tooltip" id="viewerTip" hidden></div>
+        </div>
+        <div class="viewer-controls">
+          <label class="check"><input type="checkbox" id="optBonds" checked> Bonds</label>
+          <label class="check"><input type="checkbox" id="optCell" checked> Cell</label>
+          <label class="field-inline">Labels
+            <select id="optLabels">
+              <option value="none">None</option>
+              <option value="index">Atom number</option>
+              <option value="element">Element + number</option>
+              <option value="eta">Overpotential</option>
+            </select>
+          </label>
+          <label class="field-inline">Repeat
+            <select id="optRep">
+              <option value="1,1,1">1 x 1 x 1</option>
+              <option value="2,2,1">2 x 2 x 1</option>
+              <option value="3,3,1">3 x 3 x 1</option>
+              <option value="2,2,2">2 x 2 x 2</option>
+            </select>
+          </label>
+          <label class="field-inline">Size
+            <input type="range" id="optSize" min="0.5" max="1.8" step="0.05" value="1">
+          </label>
+          <button id="savePngBtn" class="btn btn-small btn-ghost" type="button">Save PNG</button>
+        </div>
+      </section>
+    </main>
+    </div><!-- /sectionActivity -->
+
+    <div class="section active" id="sectionDos" role="tabpanel">
+      <section class="setup setup-dos">
+        <section class="panel run-panel">
+          <div class="panel-head"><h2>Structure input</h2><span class="muted" id="dosEngineNote"></span></div>
+          <div class="file-line">
+            <button id="dosOpenBtn" class="btn btn-secondary" type="button">Open structure</button>
+            <span class="muted small">CIF, POSCAR / CONTCAR, .vasp, .xyz, .cc1, ...</span>
+          </div>
+          <div class="file-details" id="dosFileDetails" aria-live="polite">
+            <span class="file-label">No structure selected</span>
+            <span class="file-subtext">Choose the CONTCAR (or any structure file) of an N-doped or defective graphene-based system.</span>
+          </div>
+          <div class="run-line">
+            <button id="dosRunBtn" class="btn btn-primary" type="button" disabled>
+              <span class="btn-spinner" aria-hidden="true"></span>
+              <span id="dosRunText">Predict PDOS</span>
+            </button>
+            <div class="progress" id="dosProgress" hidden><div class="progress-bar" id="dosProgressBar"></div></div>
+          </div>
+        </section>
+        <section class="panel info-panel">
+          <div class="panel-head"><h2>PDOS model</h2></div>
+          <p class="hint">Graph network (stage 1) plus 1D sharpening network (stage 2). One curve set per atom: s, p<sub>y</sub>, p<sub>z</sub>, p<sub>x</sub>, spin up and down, E &minus; E<sub>F</sub> from &minus;25 to +10 eV (3000 points).</p>
+          <p class="hint" id="dosMetrics"></p>
+        </section>
+      </section>
+
+      <main class="workspace">
+        <section class="panel dos-panel">
+          <div class="pane-head">
+            <div class="tabs" role="tablist">
+              <button class="dos-tab-btn active" role="tab" data-dostab="dosPlotView" type="button">PDOS</button>
+              <button class="dos-tab-btn" role="tab" data-dostab="dosTableView" type="button">Atoms</button>
+              <button class="dos-tab-btn" role="tab" data-dostab="dosLogView" type="button">Log</button>
+            </div>
+            <div class="atom-picker" id="atomPicker" hidden>
+              <button type="button" class="icon-btn" id="dosPrev" title="Previous atom">&lsaquo;</button>
+              <label class="field-inline">Atom <input type="number" id="dosAtomNum" min="1" value="1"></label>
+              <span class="muted" id="dosAtomOf"></span>
+              <span class="pill best" id="dosAtomTag"><b>-</b></span>
+              <button type="button" class="icon-btn" id="dosNext" title="Next atom">&rsaquo;</button>
+            </div>
+          </div>
+          <div class="pane-body dos-body">
+            <div id="dosPlotView" class="dos-pane active dos-plot-pane">
+              <div class="plot-stage" id="plotStage">
+                <canvas id="plotCanvas" aria-label="PDOS plot"></canvas>
+                <div class="empty-state plot-empty" id="plotEmpty">
+                  <p>No PDOS yet.</p>
+                  <p class="muted">Open a structure and choose Predict PDOS. The PDOS of the first atom shows here; pick any other atom with the arrows or by clicking it in the structure.</p>
+                </div>
+                <div class="plot-tip" id="plotTip" hidden></div>
+              </div>
+              <div class="plot-controls" id="plotControls">
+                <label class="check"><input type="checkbox" data-orb="0" checked> s</label>
+                <label class="check"><input type="checkbox" data-orb="1" checked> p<sub>y</sub></label>
+                <label class="check"><input type="checkbox" data-orb="2" checked> p<sub>z</sub></label>
+                <label class="check"><input type="checkbox" data-orb="3" checked> p<sub>x</sub></label>
+                <span class="sep"></span>
+                <label class="check"><input type="checkbox" id="spinUp" checked> up</label>
+                <label class="check"><input type="checkbox" id="spinDn" checked> down</label>
+                <span class="sep"></span>
+                <span class="muted">E (eV)</span>
+                <input type="number" id="eMin" value="-10" step="1" aria-label="Minimum energy">
+                <span class="muted">&ndash;</span>
+                <input type="number" id="eMax" value="5" step="1" aria-label="Maximum energy">
+                <button type="button" class="btn btn-small btn-ghost" id="eFull">Full</button>
+              </div>
+            </div>
+            <div id="dosTableView" class="dos-pane">
+              <div class="table-container">
+                <table class="data-table" id="dosTable" hidden>
+                  <thead><tr>
+                    <th>Atom</th>
+                    <th class="num" title="p_y at E_F (up - |down|)">p<sub>y</sub> E<sub>F</sub></th><th class="num" title="p_y occupancy, integral below E_F">p<sub>y</sub> occ</th>
+                    <th class="num" title="p_z at E_F (up - |down|)">p<sub>z</sub> E<sub>F</sub></th><th class="num" title="p_z occupancy, integral below E_F">p<sub>z</sub> occ</th>
+                    <th class="num" title="p_x at E_F (up - |down|)">p<sub>x</sub> E<sub>F</sub></th><th class="num" title="p_x occupancy, integral below E_F">p<sub>x</sub> occ</th>
+                  </tr></thead>
+                  <tbody id="dosTableBody"></tbody>
+                </table>
+                <div class="empty-state" id="dosTableEmpty"><p>No results yet.</p><p class="muted">Descriptors computed from the predicted PDOS (same definition as in training) list here.</p></div>
+              </div>
+            </div>
+            <div id="dosLogView" class="dos-pane"><div class="console-box"><pre id="dosLog"></pre></div></div>
+          </div>
+          <div class="pane-foot">
+            <button id="dosSavePlot" class="btn btn-small" type="button" disabled>Save this plot (PNG)</button>
+            <span class="sep"></span>
+            <span class="muted">All atoms</span>
+            <select id="dosExportFmt" aria-label="Image format"><option value="png">PNG</option><option value="jpg">JPG</option></select>
+            <select id="dosExportDpi" aria-label="Resolution"><option value="100">100 dpi</option><option value="150" selected>150 dpi</option><option value="300">300 dpi</option></select>
+            <button id="dosExportBtn" class="btn btn-small btn-primary" type="button" disabled>Download plots (ZIP)</button>
+          </div>
+        </section>
+
+        <section class="panel viewer-panel">
+          <div class="pane-head"><h2 id="dosStructTitle">Structure</h2><span class="muted small">click an atom to show its PDOS</span></div>
+          <div class="viewer-stage" id="dosViewerStage">
+            <canvas id="dosViewerCanvas" aria-label="3D structure viewer"></canvas>
+            <div class="viewer-views">
+              <button type="button" class="icon-btn" data-dview="top" title="Look along c">Top</button>
+              <button type="button" class="icon-btn" data-dview="front" title="Look along b">Front</button>
+              <button type="button" class="icon-btn" data-dview="side" title="Look along a">Side</button>
+              <button type="button" class="icon-btn" data-dview="iso" title="Reset view">Reset</button>
+            </div>
+            <div class="atom-info" id="dosAtomInfo" hidden></div>
+            <div class="tooltip" id="dosViewerTip" hidden></div>
+          </div>
+          <div class="viewer-controls">
+            <label class="check"><input type="checkbox" id="dosOptBonds" checked> Bonds</label>
+            <label class="check"><input type="checkbox" id="dosOptCell" checked> Cell</label>
+            <label class="field-inline">Labels
+              <select id="dosOptLabels"><option value="none">None</option><option value="index">Atom number</option><option value="element">Element + number</option></select>
+            </label>
+            <label class="field-inline">Repeat
+              <select id="dosOptRep"><option value="1,1,1">1 x 1 x 1</option><option value="2,2,1">2 x 2 x 1</option><option value="3,3,1">3 x 3 x 1</option></select>
+            </label>
+            <label class="field-inline">Size <input type="range" id="dosOptSize" min="0.5" max="1.8" step="0.05" value="1"></label>
+            <button id="dosSaveStruct" class="btn btn-small btn-ghost" type="button">Save PNG</button>
+          </div>
+        </section>
+      </main>
+    </div><!-- /sectionDos -->
+
+    <div class="section" id="sectionRelax" role="tabpanel">
+      <section class="panel" style="max-width:860px">
+        <div class="panel-head"><h2>Structure Relaxor is not available in the browser</h2></div>
+        <p>The Structure Relaxor runs <b>vasp-mace</b> with the <b>MACE-MH-1</b> machine-learning potential. This needs PyTorch and several GB of
+        software, which cannot run inside a web page. Activity Screening and the DOS Predictor on this site run entirely in your browser, so your files never leave your computer.</p>
+        <p>To relax structures, use one of these:</p>
+        <ul class="cite-list">
+          <li><b>Desktop app</b> (Windows, macOS, Linux): the full Padarth Khoj with all three tools, installed with one click.
+            <a href="#" data-ext="https://github.com/ranjitphy/padarthkhoj">github.com/ranjitphy/padarthkhoj</a></li>
+          <li><b>Self-hosted web version</b>: the same interface served from your own computer or server with Docker or <code>run.sh</code> / <code>run.bat</code>.</li>
+        </ul>
+        <p class="hint">Cite vasp-mace (Grau-Crespo, R., Zenodo, doi:10.5281/zenodo.19479246) and MACE (Batatia et al., NeurIPS 2022) if you use relaxed structures in your work.</p>
+      </section>
+    </div><!-- /sectionRelax -->
+  </div>
+
+  <script src="version.js"></script>
+  <script src="static-shim.js"></script>
+  <script src="elements.js"></script>
+  <script src="viewer.js"></script>
+  <script src="renderer.js"></script>
+  <script src="dos.js"></script>
+</body>
+</html>

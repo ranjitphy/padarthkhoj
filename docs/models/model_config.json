@@ -1,0 +1,47 @@
+{
+  "stage1": {
+    "node_feat_dim": 104,
+    "edge_feat_dim": 68,
+    "hidden_dim": 128,
+    "n_layers": 4,
+    "n_heads": 4,
+    "energy_dim": 64,
+    "n_energies": 3000,
+    "n_orbitals": 8,
+    "cutoff_short": 4.0,
+    "cutoff_long": 6.0,
+    "smear_kBT": 0.2
+  },
+  "stage2": {
+    "n_channels": 8,
+    "base_ch": 32,
+    "kernel": 15,
+    "n_grid": 3000
+  },
+  "E_MIN": -25.0,
+  "E_MAX": 10.0,
+  "N_GRID": 3000,
+  "normalizer": {
+    "scale_up": 1.221206545829773,
+    "scale_dn": 1.2211449146270752
+  },
+  "descriptor_normalizer": {
+    "py_fermi": 1.6158790588378906,
+    "py_occ": 0.37819933891296387,
+    "pz_fermi": 0.41433975100517273,
+    "pz_occ": 0.2500852942466736,
+    "px_fermi": 1.3668688535690308,
+    "px_occ": 0.4975298047065735
+  },
+  "descriptor_loss_weights": {
+    "lambda_desc_aux": 0.3,
+    "lambda_desc_fermi": 0.5,
+    "lambda_desc_occ": 0.2,
+    "lambda_desc_fermi_sharp": 0.5,
+    "lambda_desc_occ_sharp": 0.2,
+    "fermi_window_pts": 0,
+    "fermi_reweight_alpha_py": 2.0,
+    "fermi_reweight_alpha_pz": 2.0,
+    "fermi_reweight_alpha_px": 2.0
+  }
+}
